@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VyntaCAD | MONAI Medical AI Web Viewer</title>
+  <style>
+    :root {
+      --bg-dark: #0a0e14;
+      --panel-bg: #121820;
+      --card-bg: #1a222d;
+      --border-color: #2a3644;
+      --accent-blue: #0088ff;
+      --accent-cyan: #00d2ff;
+      --accent-green: #00e676;
+      --text-main: #e2e8f0;
+      --text-muted: #8492a6;
+      --hud-text: #00e676;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Top Navigation Header */
+    header {
+      background: var(--panel-bg);
+      border-bottom: 1px solid var(--border-color);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 52px;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, #0088ff, #00d2ff);
+      color: #fff;
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      font-weight: 800;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    select, button {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    select:hover, button:hover {
+      border-color: var(--accent-blue);
+    }
+
+    button.btn-primary {
+      background: linear-gradient(135deg, #0070f3, #0051bb);
+      border: none;
+      color: white;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button.btn-primary:hover {
+      background: linear-gradient(135deg, #0080ff, #0060dd);
+      box-shadow: 0 0 10px rgba(0, 112, 243, 0.4);
+    }
+
+    button.btn-active {
+      background: var(--accent-blue);
+      border-color: var(--accent-cyan);
+      color: white;
+    }
+
+    /* Main Content Layout */
+    .app-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Left Control Sidebar */
+    aside {
+      width: 320px;
+      background: var(--panel-bg);
+      border-right: 1px solid var(--border-color);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      overflow-y: auto;
+      z-index: 5;
+    }
+
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .preset-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .btn-preset {
+      font-size: 12px;
+      padding: 6px 8px;
+      text-align: center;
+      border-radius: 5px;
+    }
+
+    .slider-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .slider-label span:last-child {
+      color: var(--text-main);
+      font-weight: 600;
+      font-family: monospace;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 5px;
+      background: #242f3d;
+      border-radius: 3px;
+      outline: none;
+      accent-color: var(--accent-blue);
+      cursor: pointer;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+
+    .toggle-row input[type="checkbox"] {
+      cursor: pointer;
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent-green);
+    }
+
+    /* Central Viewport & Canvas */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background: #000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .viewport-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      cursor: crosshair;
+    }
+
+    canvas {
+      image-rendering: pixelated;
+      max-width: 95%;
+      max-height: 95%;
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+    }
+
+    /* Radiology 4-Corner HUD */
+    .hud {
+      position: absolute;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 12px;
+      color: var(--hud-text);
+      text-shadow: 1px 1px 2px #000, -1px -1px 2px #000;
+      pointer-events: none;
+      line-height: 1.4;
+      z-index: 8;
+    }
+
+    .hud-tl { top: 16px; left: 16px; }
+    .hud-tr { top: 16px; right: 16px; text-align: right; }
+    .hud-bl { bottom: 16px; left: 16px; }
+    .hud-br { bottom: 16px; right: 16px; text-align: right; }
+
+    /* Bottom Slider Navigation Bar */
+    .footer-bar {
+      background: var(--panel-bg);
+      border-top: 1px solid var(--border-color);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      height: 56px;
+      z-index: 10;
+    }
+
+    .slice-info-pill {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-family: monospace;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    /* Loading Spinner Overlay */
+    #loadingOverlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(10, 14, 20, 0.85);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      z-index: 50;
+    }
+
+    .spinner {
+      width: 42px;
+      height: 42px;
+      border: 4px solid var(--border-color);
+      border-top-color: var(--accent-cyan);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Notification Toast */
+    #toast {
+      position: fixed;
+      bottom: 70px;
+      right: 24px;
+      background: #1e293b;
+      border: 1px solid var(--accent-cyan);
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 6px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+      font-size: 13px;
+      display: none;
+      z-index: 100;
+    }
+
+    /* Level 2 CADe Nodule Findings List & Cards */
+    .nodule-badge-count {
+      background: rgba(255, 170, 0, 0.15);
+      color: #ffaa00;
+      border: 1px solid #ffaa00;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .nodule-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 220px;
+      overflow-y: auto;
+      margin-top: 10px;
+      padding-right: 4px;
+    }
+
+    .nodule-list::-webkit-scrollbar {
+      width: 4px;
+    }
+    .nodule-list::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 2px;
+    }
+
+    .nodule-card {
+      background: #141c26;
+      border: 1px solid #2a3644;
+      border-radius: 6px;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nodule-card:hover {
+      border-color: #ffaa00;
+      background: #182332;
+      box-shadow: 0 0 8px rgba(255, 170, 0, 0.2);
+    }
+
+    .nodule-card.active {
+      border-color: #ffaa00;
+      background: rgba(255, 170, 0, 0.14);
+      box-shadow: 0 0 10px rgba(255, 170, 0, 0.35);
+    }
+
+    .nodule-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: #ffaa00;
+    }
+
+    .slice-jump-pill {
+      background: #242f3d;
+      color: #00d2ff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+
+    .nodule-card-details {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .nodule-card-details span strong {
+      color: var(--text-main);
+    }
+
+    .nodule-risk-tag {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      display: inline-block;
+      width: fit-content;
+      font-weight: 600;
+    }
+
+    .risk-low {
+      background: rgba(0, 230, 118, 0.15);
+      color: #00e676;
+    }
+
+    .risk-int {
+      background: rgba(255, 170, 0, 0.15);
+      color: #ffaa00;
+    }
+
+    .risk-high {
+      background: rgba(255, 45, 85, 0.15);
+      color: #ff2d55;
+    }
+
+    /* Level 3 CADx Diagnostic Controls & Lung-RADS */
+    .filter-btn-group {
+      display: flex;
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    .btn-filter {
+      flex: 1;
+      padding: 4px 6px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      background: #18222e;
+      color: var(--text-muted);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+
+    .btn-filter:hover {
+      border-color: var(--accent-cyan);
+      color: var(--text-main);
+    }
+
+    .btn-filter.active {
+      background: #0088ff;
+      border-color: #00d2ff;
+      color: #fff;
+    }
+
+    .btn-filter-cat4.active {
+      background: #ff2d55;
+      border-color: #ff557f;
+      color: #fff;
+    }
+
+    .btn-filter-cat3.active {
+      background: #ffaa00;
+      border-color: #ffd000;
+      color: #000;
+    }
+
+    .btn-filter-cat2.active {
+      background: #00e676;
+      border-color: #69f0ae;
+      color: #000;
+    }
+
+    .lung-rads-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-family: monospace;
+    }
+
+    .lung-rads-2 {
+      background: rgba(0, 230, 118, 0.15);
+      color: #00e676;
+      border: 1px solid #00e676;
+    }
+
+    .lung-rads-3 {
+      background: rgba(255, 170, 0, 0.15);
+      color: #ffaa00;
+      border: 1px solid #ffaa00;
+    }
+
+    .lung-rads-4 {
+      background: rgba(255, 45, 85, 0.15);
+      color: #ff2d55;
+      border: 1px solid #ff2d55;
+    }
+
+    .mal-meter-container {
+      width: 100%;
+      height: 4px;
+      background: #242f3d;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 3px;
+    }
+
+    .mal-meter-fill {
+      height: 100%;
+      transition: width 0.3s ease;
+      border-radius: 2px;
+    }
+
+    /* CADx Diagnostic Inspector Drawer */
+    #diagnosticInspector {
+      background: #0f1622;
+      border: 1px solid #0088ff;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-top: 10px;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+      animation: fadeIn 0.2s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <span>VYNTACAD</span>
+      <span class="brand-badge">MONAI Medical AI</span>
+    </div>
+
+    <div class="header-controls">
+      <label style="font-size:12px; color:var(--text-muted)">Active Study:</label>
+      <select id="studySelect" onchange="loadSelectedStudy()">
+        <option value="">Loading studies...</option>
+      </select>
+
+      <button id="cineBtn" onclick="toggleCinePlay()">▶ Cine Play</button>
+      <button class="btn-primary" onclick="triggerRunAI()">⚡ Run AI Analysis</button>
+    </div>
+  </header>
+
+  <!-- Main Body -->
+  <div class="app-body">
+    <!-- Sidebar -->
+    <aside>
+      <!-- Window/Level Presets -->
+      <div>
+        <div class="section-title">Window / Level Presets (HU)</div>
+        <div class="card">
+          <div class="preset-grid">
+            <button class="btn-preset btn-active" onclick="setPreset(-600, 1500)">🫁 Lung</button>
+            <button class="btn-preset" onclick="setPreset(40, 350)">🫀 Soft Tissue</button>
+            <button class="btn-preset" onclick="setPreset(400, 1800)">🦴 Bone</button>
+            <button class="btn-preset" onclick="setPreset(40, 80)">🧠 Brain</button>
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-label">
+              <span>Window Center (Level)</span>
+              <span id="wlVal">-600 HU</span>
+            </div>
+            <input type="range" id="wlSlider" min="-1000" max="1000" value="-600" oninput="onWindowChange()">
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-label">
+              <span>Window Width</span>
+              <span id="wwVal">1500 HU</span>
+            </div>
+            <input type="range" id="wwSlider" min="50" max="3000" value="1500" oninput="onWindowChange()">
+          </div>
+        </div>
+      </div>
+
+      <!-- AI DICOM-SEG Overlay Layer -->
+      <div>
+        <div class="section-title">AI DICOM-SEG Overlay</div>
+        <div class="card">
+          <div class="toggle-row">
+            <label for="segToggle" style="font-size:13px; font-weight:600;">Enable Segmentation</label>
+            <input type="checkbox" id="segToggle" checked onchange="redrawSlice()">
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-label">
+              <span>Mask Opacity</span>
+              <span id="opacityVal">55%</span>
+            </div>
+            <input type="range" id="opacitySlider" min="0" max="100" value="55" oninput="onOpacityChange()">
+          </div>
+
+          <div class="slider-row" style="margin-top: 10px;">
+            <div class="slider-label"><span>Overlay Tint</span></div>
+            <select id="colorSelect" onchange="onColorChange()">
+              <option value="red">Crimson Red</option>
+              <option value="green">Emerald Green</option>
+              <option value="cyan">Cyan / Aqua</option>
+              <option value="yellow">Amber Yellow</option>
+            </select>
+          </div>
+
+          <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border-color); font-size:12px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+              <span style="color:var(--text-muted);">Organ:</span>
+              <span id="organName" style="color:var(--accent-cyan); font-weight:600;">Spleen (78961009)</span>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:var(--text-muted);">Segmented Vol:</span>
+              <span id="organVolume" style="font-weight:600;">-- mL</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Level 2 & 3: CADe Detection & CADx Diagnostics -->
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div class="section-title" style="margin-bottom:0;">Level 2 & 3: CADe / CADx AI</div>
+          <span id="noduleCountBadge" class="nodule-badge-count">0 Found</span>
+        </div>
+        <div class="card">
+          <div class="toggle-row">
+            <label for="detectToggle" style="font-size:13px; font-weight:600; color:#ffaa00;">Target Bounding Boxes</label>
+            <input type="checkbox" id="detectToggle" checked onchange="redrawSlice()">
+          </div>
+
+          <!-- Lung-RADS Triage Filter Bar -->
+          <div style="margin-top:10px;">
+            <div style="font-size:11px; color:var(--text-muted); display:flex; justify-content:space-between; margin-bottom:4px;">
+              <span>Lung-RADS Triage Filter:</span>
+              <span id="activeFilterLabel" style="color:var(--accent-cyan); font-weight:600;">All (0)</span>
+            </div>
+            <div class="filter-btn-group">
+              <button id="filterBtnAll" class="btn-filter active" onclick="setCadxFilter('ALL')">All</button>
+              <button id="filterBtnCat4" class="btn-filter btn-filter-cat4" onclick="setCadxFilter('CAT4')">🚨 Cat 4</button>
+              <button id="filterBtnCat3" class="btn-filter btn-filter-cat3" onclick="setCadxFilter('CAT3')">⚠️ Cat 3</button>
+              <button id="filterBtnCat2" class="btn-filter btn-filter-cat2" onclick="setCadxFilter('CAT2')">🟢 Cat 2</button>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:6px; margin-top:10px;">
+            <button class="btn-preset" style="flex:1; border-color:#0088ff; color:#0088ff;" onclick="triggerRunDetection()">
+              ⚡ Re-run CADe / CADx
+            </button>
+          </div>
+
+          <!-- Nodule List Container -->
+          <div id="noduleListContainer" class="nodule-list">
+            <div style="font-size:11px; color:var(--text-muted); text-align:center; padding:12px;">
+              Loading detections...
+            </div>
+          </div>
+
+          <!-- Level 3 CADx Diagnostic Inspector Box -->
+          <div id="diagnosticInspector">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #242f3d; padding-bottom:4px;">
+              <span style="font-weight:700; color:var(--accent-cyan);">🔬 Diagnostic Profile</span>
+              <span id="inspNoduleTitle" style="font-family:monospace; color:#fff; font-weight:700;">Nodule #--</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="color:var(--text-muted);">ACR Assessment:</span>
+              <span id="inspCategoryBadge" class="lung-rads-badge lung-rads-2">Category 2</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="color:var(--text-muted);">Malignancy Risk:</span>
+              <span id="inspMalVal" style="font-weight:700; color:#00e676;">0.5% (Benign)</span>
+            </div>
+            <div class="mal-meter-container">
+              <div id="inspMalBar" class="mal-meter-fill" style="width:5%; background:#00e676;"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:var(--text-muted);">Margin Texture:</span>
+              <span id="inspMargin" style="color:var(--text-main); font-weight:600;">Smooth</span>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:var(--text-muted);">Calcification:</span>
+              <span id="inspCalc" style="color:var(--text-main);">None</span>
+            </div>
+            <div style="background:#141c26; border-radius:4px; padding:6px; margin-top:2px; border-left:3px solid #0088ff;">
+              <div style="color:var(--text-muted); font-size:10px; font-weight:600; text-transform:uppercase;">Clinical Recommendation:</div>
+              <div id="inspRecommendation" style="color:var(--text-main); font-size:11px; margin-top:2px; line-height:1.3;">--</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Patient & Study Info -->
+      <div>
+        <div class="section-title">DICOM Metadata</div>
+        <div class="card" style="font-size:12px; line-height:1.6; color:var(--text-muted);">
+          <div>Patient ID: <strong id="metaPatientId" style="color:var(--text-main);">--</strong></div>
+          <div>Modality: <strong style="color:var(--text-main);">CT (3D Axial)</strong></div>
+          <div>Slice Count: <strong id="metaSliceCount" style="color:var(--text-main);">--</strong></div>
+          <div>Spacing: <strong id="metaSpacing" style="color:var(--text-main);">--</strong></div>
+          <div>Thickness: <strong id="metaThickness" style="color:var(--text-main);">--</strong></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Viewport Canvas -->
+    <main id="viewportArea">
+      <div class="viewport-container" id="viewportContainer">
+        <!-- Canvas for rendering -->
+        <canvas id="ctCanvas" width="512" height="512"></canvas>
+
+        <!-- HUD Corners -->
+        <div class="hud hud-tl">
+          <div id="hudPatient">PATIENT: --</div>
+          <div>MODALITY: CT (512x512)</div>
+          <div>ENGINE: MONAI CPU</div>
+        </div>
+        <div class="hud hud-tr">
+          <div>VYNTACAD WORKSTATION</div>
+          <div id="hudThickness">THICKNESS: -- mm</div>
+          <div id="hudSpacing">SPACING: -- mm</div>
+        </div>
+        <div class="hud hud-bl">
+          <div id="hudSlice">SLICE: 1 / 1</div>
+          <div id="hudZ">Z: 0.0 mm</div>
+          <div>ZOOM: 100%</div>
+        </div>
+        <div class="hud hud-br">
+          <div id="hudWl">W: 1500 L: -600</div>
+          <div id="hudSegStatus">SEG: ACTIVE</div>
+          <div id="hudCadStatus" style="color:#ffaa00;">CADe: ACTIVE</div>
+        </div>
+      </div>
+
+      <!-- Loading overlay -->
+      <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <div id="loadingText" style="font-size:14px; font-weight:600; color:var(--accent-cyan);">Processing CT Slices...</div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Bottom Navigation Slider -->
+  <div class="footer-bar">
+    <button onclick="stepSlice(-1)">◀ Prev</button>
+    <input type="range" id="sliceSlider" min="0" max="0" value="0" oninput="onSliceSlider(this.value)">
+    <button onclick="stepSlice(1)">Next ▶</button>
+    <div class="slice-info-pill" id="slicePill">Slice: 1 / 1</div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    // State management
+    let currentStudy = "";
+    let seriesInfo = null;
+    let currentSliceIdx = 0;
+    let isCinePlaying = false;
+    let cineInterval = null;
+    let cineFps = 20;
+    let detectedNodules = [];
+    let activeLungRadsFilter = 'ALL';
+    let selectedNoduleId = null;
+
+    // Image & Mask Elements for Canvas Compositing
+    const ctImage = new Image();
+    const maskImage = new Image();
+    let isCtLoaded = false;
+    let isMaskLoaded = false;
+
+    const canvas = document.getElementById("ctCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Initialize application
+    window.addEventListener("DOMContentLoaded", async () => {
+      await fetchStudyList();
+      setupMouseInteractions();
+      setupKeyboardShortcuts();
+    });
+
+    // Fetch study directories from backend
+    async function fetchStudyList() {
+      try {
+        const res = await fetch("/api/v1/viewer/studies");
+        const studies = await res.json();
+        const select = document.getElementById("studySelect");
+        select.innerHTML = "";
+        
+        studies.forEach(s => {
+          const opt = document.createElement("option");
+          opt.value = s;
+          opt.textContent = s;
+          if (s === "pasien_01") opt.selected = true;
+          select.appendChild(opt);
+        });
+
+        if (studies.length > 0) {
+          loadSelectedStudy();
+        }
+      } catch (err) {
+        showToast("Error connecting to backend API: " + err.message);
+      }
+    }
+
+    // Load series metadata for chosen study
+    async function loadSelectedStudy() {
+      const select = document.getElementById("studySelect");
+      currentStudy = select.value;
+      if (!currentStudy) return;
+
+      showLoading("Loading series metadata...");
+      try {
+        const res = await fetch(`/api/v1/viewer/series/${currentStudy}`);
+        seriesInfo = await res.json();
+
+        // Update UI
+        document.getElementById("metaPatientId").textContent = seriesInfo.patient_id;
+        document.getElementById("metaSliceCount").textContent = seriesInfo.num_slices;
+        document.getElementById("metaSpacing").textContent = `${seriesInfo.voxel_spacing[0].toFixed(2)} x ${seriesInfo.voxel_spacing[1].toFixed(2)} mm`;
+        document.getElementById("metaThickness").textContent = `${seriesInfo.slice_thickness.toFixed(2)} mm`;
+
+        document.getElementById("hudPatient").textContent = `PATIENT: ${seriesInfo.patient_id}`;
+        document.getElementById("hudThickness").textContent = `THICKNESS: ${seriesInfo.slice_thickness.toFixed(2)} mm`;
+        document.getElementById("hudSpacing").textContent = `SPACING: ${seriesInfo.voxel_spacing[0].toFixed(2)} mm`;
+
+        const slider = document.getElementById("sliceSlider");
+        slider.max = seriesInfo.num_slices - 1;
+        currentSliceIdx = Math.floor(seriesInfo.num_slices / 2);
+        slider.value = currentSliceIdx;
+
+        if (seriesInfo.organ_name) {
+          document.getElementById("organName").textContent = seriesInfo.organ_name;
+        }
+        if (seriesInfo.organ_volume_ml) {
+          document.getElementById("organVolume").textContent = `${seriesInfo.organ_volume_ml} mL`;
+        }
+
+        // Auto-select lung window preset and cyan color for chest CT scans
+        if (currentStudy === "pasien_01") {
+          document.getElementById("colorSelect").value = "cyan";
+          setPreset(-600, 1500);
+        } else {
+          document.getElementById("colorSelect").value = "red";
+          setPreset(40, 350);
+        }
+
+        loadSlice(currentSliceIdx);
+        await fetchDetections(currentStudy);
+      } catch (err) {
+        showToast("Failed to load study: " + err.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    // Load and render slice images
+    function loadSlice(idx) {
+      if (!seriesInfo) return;
+      currentSliceIdx = Math.max(0, Math.min(idx, seriesInfo.num_slices - 1));
+      
+      const wl = document.getElementById("wlSlider").value;
+      const ww = document.getElementById("wwSlider").value;
+      const color = document.getElementById("colorSelect").value;
+
+      // Update HUD
+      document.getElementById("hudSlice").textContent = `SLICE: ${currentSliceIdx + 1} / ${seriesInfo.num_slices}`;
+      const zPos = seriesInfo.z_positions[currentSliceIdx] || 0.0;
+      document.getElementById("hudZ").textContent = `Z: ${zPos.toFixed(1)} mm`;
+      document.getElementById("hudWl").textContent = `W: ${ww} L: ${wl}`;
+      document.getElementById("slicePill").textContent = `Slice: ${currentSliceIdx + 1} / ${seriesInfo.num_slices}`;
+      document.getElementById("sliceSlider").value = currentSliceIdx;
+
+      // Request CT PNG
+      isCtLoaded = false;
+      isMaskLoaded = false;
+
+      ctImage.onload = () => {
+        isCtLoaded = true;
+        redrawSlice();
+      };
+      ctImage.src = `/api/v1/viewer/slice/${currentStudy}/${currentSliceIdx}?wl=${wl}&ww=${ww}&t=${Date.now()}`;
+
+      // Request Mask PNG
+      maskImage.onload = () => {
+        isMaskLoaded = true;
+        redrawSlice();
+      };
+      maskImage.src = `/api/v1/viewer/mask/${currentStudy}/${currentSliceIdx}?color=${color}&t=${Date.now()}`;
+
+      updateNoduleCardHighlight();
+    }
+
+    // Compositing CT Grayscale + DICOM-SEG overlay + CADe Nodule Overlays
+    function redrawSlice() {
+      if (!isCtLoaded) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = false;
+
+      // 1. Draw base CT
+      ctx.drawImage(ctImage, 0, 0, canvas.width, canvas.height);
+
+      // 2. Draw AI mask overlay if enabled
+      const segEnabled = document.getElementById("segToggle").checked;
+      const opacity = document.getElementById("opacitySlider").value / 100.0;
+
+      if (segEnabled && isMaskLoaded && opacity > 0) {
+        ctx.save();
+        ctx.globalAlpha = opacity;
+        ctx.drawImage(maskImage, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
+        document.getElementById("hudSegStatus").textContent = "SEG: ACTIVE";
+        document.getElementById("hudSegStatus").style.color = "var(--hud-text)";
+      } else {
+        document.getElementById("hudSegStatus").textContent = "SEG: HIDDEN";
+        document.getElementById("hudSegStatus").style.color = "var(--text-muted)";
+      }
+
+      // 3. Draw AI CADe / CADx Pulmonary Nodule Target Overlays
+      const detectToggle = document.getElementById("detectToggle");
+      const detectEnabled = detectToggle ? detectToggle.checked : false;
+      let activeNodulesOnSlice = 0;
+
+      if (detectEnabled && detectedNodules && detectedNodules.length > 0) {
+        detectedNodules.forEach(nodule => {
+          // Check Lung-RADS triage filter
+          if (activeLungRadsFilter === 'CAT4' && !(nodule.lung_rads_category && nodule.lung_rads_category.includes('Category 4'))) return;
+          if (activeLungRadsFilter === 'CAT3' && !(nodule.lung_rads_category && nodule.lung_rads_category.includes('Category 3'))) return;
+          if (activeLungRadsFilter === 'CAT2' && !(nodule.lung_rads_category && nodule.lung_rads_category.includes('Category 2'))) return;
+
+          const [xmin, ymin, zmin, xmax, ymax, zmax] = nodule.voxel_box;
+          const [xc, yc, zc] = nodule.centroid_voxel;
+
+          // Check if nodule spans the current slice
+          if (currentSliceIdx >= zmin && currentSliceIdx <= zmax) {
+            activeNodulesOnSlice++;
+            const isCenterSlice = (currentSliceIdx === nodule.slice_index);
+            const boxColor = nodule.severity_color || (isCenterSlice ? "#ffaa00" : "rgba(255, 170, 0, 0.7)");
+
+            // Calculate box on 512x512 slice with slight padding
+            const pad = 6;
+            const bx = Math.max(0, xmin - pad);
+            const by = Math.max(0, ymin - pad);
+            const bw = (xmax - xmin) + pad * 2;
+            const bh = (ymax - ymin) + pad * 2;
+
+            ctx.save();
+            // Severity-coded bounding box
+            ctx.strokeStyle = boxColor;
+            ctx.lineWidth = isCenterSlice ? 2.5 : 1.5;
+            if (!isCenterSlice) {
+              ctx.setLineDash([4, 4]);
+            }
+            ctx.strokeRect(bx, by, bw, bh);
+            ctx.setLineDash([]);
+
+            // Crosshair reticle at centroid
+            ctx.strokeStyle = boxColor;
+            ctx.lineWidth = 1.5;
+            const reticleSize = 7;
+            const gap = 3;
+            ctx.beginPath();
+            // Horizontal
+            ctx.moveTo(xc - reticleSize, yc); ctx.lineTo(xc - gap, yc);
+            ctx.moveTo(xc + gap, yc); ctx.lineTo(xc + reticleSize, yc);
+            // Vertical
+            ctx.moveTo(xc, yc - reticleSize); ctx.lineTo(xc, yc - gap);
+            ctx.moveTo(xc, yc + gap); ctx.lineTo(xc, yc + reticleSize);
+            ctx.stroke();
+
+            // Floating target label badge with Lung-RADS and Malignancy %
+            const radsTag = nodule.lung_rads_category ? (nodule.lung_rads_category.replace('Category ', 'Cat ') + ' | Mal: ' + nodule.malignancy_percent + '%') : (Math.round(nodule.confidence * 100) + '%');
+            const label = `NODULE #${nodule.nodule_id} (Ø${nodule.diameter_mm}mm | ${radsTag})`;
+            ctx.font = "bold 11px Consolas, monospace";
+            const textWidth = ctx.measureText(label).width;
+            const badgeY = Math.max(18, by - 6);
+            const badgeX = Math.min(canvas.width - textWidth - 14, Math.max(4, bx));
+
+            ctx.fillStyle = "rgba(10, 14, 20, 0.90)";
+            ctx.fillRect(badgeX, badgeY - 14, textWidth + 10, 16);
+            ctx.strokeStyle = boxColor;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(badgeX, badgeY - 14, textWidth + 10, 16);
+
+            ctx.fillStyle = boxColor;
+            ctx.fillText(label, badgeX + 5, badgeY - 2);
+            ctx.restore();
+          }
+        });
+      }
+
+      const hudCad = document.getElementById("hudCadStatus");
+      if (hudCad) {
+        if (!detectEnabled) {
+          hudCad.textContent = "CADe: OFF";
+          hudCad.style.color = "var(--text-muted)";
+        } else if (activeNodulesOnSlice > 0) {
+          hudCad.textContent = `CADe: ${activeNodulesOnSlice} TARGET(S) ON SLICE`;
+          hudCad.style.color = "#ffaa00";
+        } else {
+          hudCad.textContent = "CADe: SCANNING";
+          hudCad.style.color = "var(--text-muted)";
+        }
+      }
+    }
+
+    // Presets handler
+    function setPreset(wl, ww) {
+      document.getElementById("wlSlider").value = wl;
+      document.getElementById("wwSlider").value = ww;
+      document.getElementById("wlVal").textContent = wl + " HU";
+      document.getElementById("wwVal").textContent = ww + " HU";
+      loadSlice(currentSliceIdx);
+    }
+
+    function onWindowChange() {
+      const wl = document.getElementById("wlSlider").value;
+      const ww = document.getElementById("wwSlider").value;
+      document.getElementById("wlVal").textContent = wl + " HU";
+      document.getElementById("wwVal").textContent = ww + " HU";
+      loadSlice(currentSliceIdx);
+    }
+
+    function onOpacityChange() {
+      document.getElementById("opacityVal").textContent = document.getElementById("opacitySlider").value + "%";
+      redrawSlice();
+    }
+
+    function onColorChange() {
+      loadSlice(currentSliceIdx);
+    }
+
+    function onSliceSlider(val) {
+      loadSlice(parseInt(val));
+    }
+
+    function stepSlice(delta) {
+      loadSlice(currentSliceIdx + delta);
+    }
+
+    // Mouse wheel scrolling
+    function setupMouseInteractions() {
+      const container = document.getElementById("viewportContainer");
+      container.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        if (e.deltaY < 0) {
+          stepSlice(1);
+        } else {
+          stepSlice(-1);
+        }
+      }, { passive: false });
+    }
+
+    // Keyboard navigation
+    function setupKeyboardShortcuts() {
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowUp" || e.key === "ArrowRight") {
+          stepSlice(1);
+        } else if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
+          stepSlice(-1);
+        } else if (e.key === " ") {
+          toggleCinePlay();
+        }
+      });
+    }
+
+    // Cine play loop
+    function toggleCinePlay() {
+      isCinePlaying = !isCinePlaying;
+      const btn = document.getElementById("cineBtn");
+      if (isCinePlaying) {
+        btn.textContent = "⏸ Pause";
+        btn.classList.add("btn-active");
+        cineInterval = setInterval(() => {
+          let next = currentSliceIdx + 1;
+          if (next >= seriesInfo.num_slices) next = 0;
+          loadSlice(next);
+        }, 1000 / cineFps);
+      } else {
+        btn.textContent = "▶ Cine Play";
+        btn.classList.remove("btn-active");
+        clearInterval(cineInterval);
+      }
+    }
+
+    // Trigger AI pipeline via button
+    async function triggerRunAI() {
+      if (!currentStudy) return;
+      showLoading("Running MONAI CPU Inference & DICOM-SEG Generation...");
+      try {
+        const res = await fetch(`/api/v1/viewer/run-ai/${currentStudy}`, { method: "POST" });
+        const data = await res.json();
+        
+        document.getElementById("organVolume").textContent = `${data.measurements.calculated_volume_ml} mL`;
+        showToast(`AI Finished! ${data.measurements.segmented_organ}: ${data.measurements.calculated_volume_ml} mL (${data.timings_sec.total_pipeline}s)`);
+        
+        // Refresh series & slice
+        await loadSelectedStudy();
+      } catch (err) {
+        showToast("Inference error: " + err.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    // Level 2 & 3: Fetch and render CADe detection & CADx diagnostic findings
+    async function fetchDetections(study) {
+      if (!study) return;
+      try {
+        const res = await fetch(`/api/v1/viewer/detections/${study}`);
+        if (!res.ok) {
+          document.getElementById("noduleCountBadge").textContent = "0 Found";
+          document.getElementById("noduleListContainer").innerHTML = `
+            <div style="font-size:11px; color:var(--text-muted); text-align:center; padding:12px;">
+              No detections available.
+            </div>`;
+          detectedNodules = [];
+          return;
+        }
+        const data = await res.json();
+        detectedNodules = data.findings || [];
+        renderNoduleList();
+        redrawSlice();
+      } catch (err) {
+        console.warn("Could not load detections:", err);
+      }
+    }
+
+    // Render nodule cards with CADx metrics and triage filter
+    function renderNoduleList() {
+      const container = document.getElementById("noduleListContainer");
+      if (!detectedNodules || detectedNodules.length === 0) {
+        document.getElementById("noduleCountBadge").textContent = "0 Found";
+        container.innerHTML = `<div style="font-size:11px; color:var(--text-muted); text-align:center; padding:12px;">No nodules detected in lung parenchyma.</div>`;
+        return;
+      }
+
+      // Compute Lung-RADS category breakdown
+      const cat4Count = detectedNodules.filter(n => n.lung_rads_category && n.lung_rads_category.includes("Category 4")).length;
+      const cat3Count = detectedNodules.filter(n => n.lung_rads_category && n.lung_rads_category.includes("Category 3")).length;
+      const cat2Count = detectedNodules.filter(n => n.lung_rads_category && n.lung_rads_category.includes("Category 2")).length;
+
+      document.getElementById("filterBtnAll").textContent = `All (${detectedNodules.length})`;
+      document.getElementById("filterBtnCat4").textContent = `🚨 Cat 4 (${cat4Count})`;
+      document.getElementById("filterBtnCat3").textContent = `⚠️ Cat 3 (${cat3Count})`;
+      document.getElementById("filterBtnCat2").textContent = `🟢 Cat 2 (${cat2Count})`;
+
+      // Apply active filter
+      let filtered = detectedNodules;
+      if (activeLungRadsFilter === "CAT4") {
+        filtered = detectedNodules.filter(n => n.lung_rads_category && n.lung_rads_category.includes("Category 4"));
+      } else if (activeLungRadsFilter === "CAT3") {
+        filtered = detectedNodules.filter(n => n.lung_rads_category && n.lung_rads_category.includes("Category 3"));
+      } else if (activeLungRadsFilter === "CAT2") {
+        filtered = detectedNodules.filter(n => n.lung_rads_category && n.lung_rads_category.includes("Category 2"));
+      }
+
+      document.getElementById("activeFilterLabel").textContent = `${activeLungRadsFilter} (${filtered.length})`;
+      document.getElementById("noduleCountBadge").textContent = `${filtered.length} / ${detectedNodules.length}`;
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div style="font-size:11px; color:var(--text-muted); text-align:center; padding:12px;">No nodules match the ${activeLungRadsFilter} filter.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(n => {
+        const radsCat = n.lung_rads_category || "Category 2";
+        let radsClass = "lung-rads-2";
+        if (radsCat.includes("Category 4")) radsClass = "lung-rads-4";
+        else if (radsCat.includes("Category 3")) radsClass = "lung-rads-3";
+
+        const malPercent = (n.malignancy_percent !== undefined) ? n.malignancy_percent : Math.round(n.confidence * 10);
+        const barColor = n.severity_color || "#00e676";
+        const isSelected = (selectedNoduleId === n.nodule_id) ? "active" : "";
+
+        return `
+          <div class="nodule-card ${isSelected}" id="noduleCard-${n.nodule_id}" onclick="selectNodule(${n.nodule_id}, ${n.slice_index})">
+            <div class="nodule-card-header">
+              <span>🎯 Nodule #${n.nodule_id}</span>
+              <span class="slice-jump-pill">Slice ${n.slice_index + 1} ↗</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
+              <span class="lung-rads-badge ${radsClass}">${radsCat}</span>
+              <span style="font-size:11px; font-weight:700; color:${barColor};">Mal: ${malPercent}%</span>
+            </div>
+            <div class="mal-meter-container">
+              <div class="mal-meter-fill" style="width:${Math.min(100, Math.max(5, malPercent))}%; background:${barColor};"></div>
+            </div>
+            <div class="nodule-card-details" style="margin-top:4px;">
+              <span>Ø <strong>${n.diameter_mm} mm</strong></span>
+              <span>Vol: <strong>${n.volume_mm3} mm³</strong></span>
+              <span>${n.mean_hu} HU</span>
+            </div>
+            <div class="nodule-card-details">
+              <span>${n.margin_type || 'Smooth'}</span>
+              <span>${n.density_type}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      updateNoduleCardHighlight();
+    }
+
+    // Triage filter click handler
+    function setCadxFilter(filterType) {
+      activeLungRadsFilter = filterType;
+      document.querySelectorAll(".btn-filter").forEach(b => b.classList.remove("active"));
+      if (filterType === "ALL") document.getElementById("filterBtnAll").classList.add("active");
+      else if (filterType === "CAT4") document.getElementById("filterBtnCat4").classList.add("active");
+      else if (filterType === "CAT3") document.getElementById("filterBtnCat3").classList.add("active");
+      else if (filterType === "CAT2") document.getElementById("filterBtnCat2").classList.add("active");
+
+      renderNoduleList();
+      redrawSlice();
+    }
+
+    // Select nodule, jump slice, and display CADx Diagnostic Profile
+    function selectNodule(noduleId, sliceIndex) {
+      selectedNoduleId = noduleId;
+      jumpToSlice(sliceIndex);
+
+      const n = detectedNodules.find(item => item.nodule_id === noduleId);
+      if (!n) return;
+
+      const inspector = document.getElementById("diagnosticInspector");
+      document.getElementById("inspNoduleTitle").textContent = `Nodule #${n.nodule_id} (Slice ${n.slice_index + 1})`;
+      
+      const badge = document.getElementById("inspCategoryBadge");
+      badge.textContent = n.lung_rads_category || "Category 2";
+      badge.className = `lung-rads-badge lung-rads-${n.lung_rads_numeric || 2}`;
+
+      const malEl = document.getElementById("inspMalVal");
+      malEl.textContent = `${n.malignancy_percent || 0.5}% (${n.risk_level || 'Benign'})`;
+      malEl.style.color = n.severity_color || "#00e676";
+
+      const barEl = document.getElementById("inspMalBar");
+      barEl.style.width = `${Math.min(100, Math.max(5, n.malignancy_percent || 1))}%`;
+      barEl.style.background = n.severity_color || "#00e676";
+
+      document.getElementById("inspMargin").textContent = `${n.margin_type || 'Smooth'} (Spic: ${n.spiculation_index || 0.1})`;
+      document.getElementById("inspCalc").textContent = n.calcification_pattern || "None";
+      document.getElementById("inspRecommendation").textContent = n.clinical_recommendation || "--";
+
+      inspector.style.display = "flex";
+      updateNoduleCardHighlight();
+    }
+
+    function jumpToSlice(sliceIdx) {
+      loadSlice(sliceIdx);
+    }
+
+    function updateNoduleCardHighlight() {
+      if (!detectedNodules || detectedNodules.length === 0) return;
+      detectedNodules.forEach(n => {
+        const card = document.getElementById(`noduleCard-${n.nodule_id}`);
+        if (!card) return;
+        const [xmin, ymin, zmin, xmax, ymax, zmax] = n.voxel_box;
+        if (currentSliceIdx >= zmin && currentSliceIdx <= zmax) {
+          card.classList.add("active");
+          if (currentSliceIdx === n.slice_index) {
+            card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+        } else if (selectedNoduleId !== n.nodule_id) {
+          card.classList.remove("active");
+        }
+      });
+    }
+
+    async function triggerRunDetection() {
+      if (!currentStudy) return;
+      showLoading("Running Level 2 CADe Detection & Level 3 CADx Diagnostics...");
+      try {
+        const res = await fetch(`/api/v1/viewer/detect/${currentStudy}`, { method: "POST" });
+        const data = await res.json();
+        showToast(`CADx Finished: ${data.total_nodules} nodules classified via ACR Lung-RADS & exported to DICOM-SR!`);
+        await fetchDetections(currentStudy);
+      } catch (err) {
+        showToast("Detection error: " + err.message);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    function showLoading(text) {
+      document.getElementById("loadingText").textContent = text;
+      document.getElementById("loadingOverlay").style.display = "flex";
+    }
+
+    function hideLoading() {
+      document.getElementById("loadingOverlay").style.display = "none";
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.style.display = "block";
+      setTimeout(() => { t.style.display = "none"; }, 4000);
+    }
+  </script>
+</body>
+</html>
