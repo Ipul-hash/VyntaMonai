@@ -27,7 +27,12 @@ def get_cached_study(study_name: str) -> Dict[str, Any]:
 
     study_dir = settings.SAMPLES_DIR / study_name
     if not study_dir.exists() or not study_dir.is_dir():
-        raise HTTPException(status_code=404, detail=f"Study '{study_name}' not found.")
+        # Fallback to direct /mnt/PACS-DATA storage path
+        pacs_data_path = Path("/mnt/PACS-DATA") / study_name
+        if pacs_data_path.exists() and pacs_data_path.is_dir():
+            study_dir = pacs_data_path
+        else:
+            raise HTTPException(status_code=404, detail=f"Study '{study_name}' not found.")
 
     logger.info(f"Caching volume for viewer: {study_name}...")
     volume_hu, sorted_datasets, meta = DICOMSeriesReader.load_series_from_directory(study_dir)

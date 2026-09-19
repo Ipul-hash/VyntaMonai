@@ -50,75 +50,103 @@ class DICOMSeriesReader:
             sorted_datasets: List of pydicom Dataset objects sorted spatially
             spatial_metadata: Dictionary containing voxel spacing, origin, and orientation
         """
+        # 1. Recursively discover all DICOM candidates in directory & subdirectories (PACS format)
         dicom_files = [
-            f for f in directory.iterdir() if f.is_file() and not f.name.startswith(".")
+            f for f in directory.rglob("*")
+            if f.is_file() and not f.name.startswith(".") and not f.name.startswith("__")
         ]
         if not dicom_files:
-            raise DICOMValidationError(f"No files found in directory {directory}")
+            raise DICOMValidationError(f"No DICOM files found in directory {directory}")
 
-        datasets: List[Dataset] = []
+        datasets_by_series: Dict[str, List[Dataset]] = {}
         for file_path in dicom_files:
             try:
                 ds = pydicom.dcmread(str(file_path), force=False)
-                # Skip non-image or secondary capture if needed
-                if hasattr(ds, "PixelData"):
+                # Ensure dataset has PixelData and basic spatial attributes
+                if hasattr(ds, "PixelData") and hasattr(ds, "ImagePositionPatient"):
                     cls.validate_dataset(ds, file_path)
-                    datasets.append(ds)
+                    s_uid = str(ds.SeriesInstanceUID)
+                    if s_uid not in datasets_by_series:
+                        datasets_by_series[s_uid] = []
+                    datasets_by_series[s_uid].append(ds)
             except Exception as e:
-                logger.warning(f"Skipping non-DICOM or unreadable file: {file_path.name} ({e})")
+                # Silently skip non-DICOM or non-image assets
+                continue
+
+        if not datasets_by_series:
+            raise DICOMValidationError(f"No valid tomographic CT image datasets found in {directory}")
+
+        # 2. Select optimal 3D series for pulmonary analysis:
+        # Priority A: Series Description containing keywords ('lung', 'paru', 'thorax', 'chest', 'axial') with >= 10 slices
+        # Priority B: Series with maximum slice count (most granular 3D volume, filters out 2D scouts)
+        def score_series(item: Tuple[str, List[Dataset]]) -> Tuple[int, int]:
+            _, d_list = item
+            count = len(d_list)
+            desc = str(getattr(d_list[0], "SeriesDescription", "")).lower()
+            is_lung_targeted = any(kw in desc for kw in ["lung", "paru", "thorax", "chest", "axial", "pulmo"])
+            target_score = 1 if (is_lung_targeted and count >= 10) else 0
+            return (target_score, count)
+
+        best_series_uid, datasets = max(datasets_by_series.items(), key=score_series)
+        series_desc = getattr(datasets[0], "SeriesDescription", "CT Series")
+        logger.info(
+            f"Selected Series UID: {best_series_uid} ('{series_desc}') with {len(datasets)} slices (out of {len(datasets_by_series)} series)."
+        )
 
         if len(datasets) < 2:
             raise DICOMValidationError(
-                f"Insufficient valid 3D CT slices found ({len(datasets)}). Need >= 2 slices."
+                f"Insufficient valid 3D CT slices found in selected series ({len(datasets)}). Need >= 2 slices."
             )
 
-        # 1. Verify consistent SeriesInstanceUID
-        series_uids = {ds.SeriesInstanceUID for ds in datasets}
-        if len(series_uids) > 1:
-            raise DICOMValidationError(
-                f"Directory contains multiple SeriesInstanceUIDs: {series_uids}"
-            )
-
-        # 2. Extract and check ImageOrientationPatient (IOP)
+        # 3. Extract and check ImageOrientationPatient (IOP)
         ref_iop = [float(x) for x in datasets[0].ImageOrientationPatient]
         r_vec = np.array(ref_iop[:3])  # Row direction cosine
         c_vec = np.array(ref_iop[3:])  # Column direction cosine
         n_vec = np.cross(r_vec, c_vec)  # Slice normal direction vector
 
-        # Sort slices by projection along the slice normal (Patient coordinate frame)
+        # Sort slices by projection along slice normal vector
         slice_positions = []
         for ds in datasets:
             iop = [float(x) for x in ds.ImageOrientationPatient]
-            if not np.allclose(iop, ref_iop, atol=1e-3):
-                raise SpatialInconsistencyError(
-                    f"Slice {ds.SOPInstanceUID} has divergent ImageOrientationPatient"
-                )
+            if not np.allclose(iop, ref_iop, atol=1e-2):
+                continue  # Skip divergent scout/topogram slices
             ipp = np.array([float(x) for x in ds.ImagePositionPatient])
             proj = np.dot(ipp, n_vec)
             slice_positions.append((proj, ds))
 
-        # Sort ascending along slice normal
-        slice_positions.sort(key=lambda x: x[0])
-        sorted_datasets = [item[1] for item in slice_positions]
-        projections = [item[0] for item in slice_positions]
+        if len(slice_positions) < 2:
+            raise SpatialInconsistencyError("Insufficient slices with consistent 3D spatial orientation.")
 
-        # 3. Calculate spatial spacing
+        # Deduplicate identical slice positions (if any) and sort ascending along slice normal
+        unique_positions: Dict[float, Tuple[float, Dataset]] = {}
+        for proj, ds in slice_positions:
+            proj_key = round(proj, 2)
+            if proj_key not in unique_positions:
+                unique_positions[proj_key] = (proj, ds)
+
+        sorted_items = sorted(unique_positions.values(), key=lambda x: x[0])
+        sorted_datasets = [item[1] for item in sorted_items]
+        projections = [item[0] for item in sorted_items]
+
+        # 4. Calculate spatial voxel spacing
         pixel_spacing = [float(x) for x in sorted_datasets[0].PixelSpacing]
         dx, dy = pixel_spacing[1], pixel_spacing[0]  # in mm (column, row)
         
         diffs = np.diff(projections)
-        slice_spacing = float(np.median(diffs))
-        if slice_spacing <= 0:
-            raise SpatialInconsistencyError("Calculated slice spacing is non-positive.")
+        positive_diffs = diffs[diffs > 0.01]
+        if len(positive_diffs) > 0:
+            slice_spacing = float(np.median(positive_diffs))
+        else:
+            slice_spacing = float(getattr(sorted_datasets[0], "SliceThickness", 1.0))
 
         dz = slice_spacing
         voxel_spacing = (dx, dy, dz)  # (X, Y, Z) in mm
 
         logger.info(
-            f"Loaded {len(sorted_datasets)} slices. Spacing (X, Y, Z): {voxel_spacing[0]:.2f}x{voxel_spacing[1]:.2f}x{voxel_spacing[2]:.2f} mm"
+            f"Loaded {len(sorted_datasets)} sorted slices. Spacing (X, Y, Z): {voxel_spacing[0]:.2f}x{voxel_spacing[1]:.2f}x{voxel_spacing[2]:.2f} mm"
         )
 
-        # 4. Construct 3D Volume and apply RescaleSlope & RescaleIntercept to HU
+        # 5. Construct 3D Volume and apply RescaleSlope & RescaleIntercept to HU
         slices_hu = []
         for ds in sorted_datasets:
             pixel_array = ds.pixel_array.astype(np.float32)
@@ -135,7 +163,7 @@ class DICOMSeriesReader:
             "origin_ipp": [float(x) for x in sorted_datasets[0].ImagePositionPatient],
             "frame_of_reference_uid": getattr(sorted_datasets[0], "FrameOfReferenceUID", ""),
             "study_instance_uid": sorted_datasets[0].StudyInstanceUID,
-            "series_instance_uid": sorted_datasets[0].SeriesInstanceUID,
+            "series_instance_uid": best_series_uid,
             "patient_id": getattr(sorted_datasets[0], "PatientID", "UNKNOWN"),
             "patient_name": str(getattr(sorted_datasets[0], "PatientName", "Anonymous")),
         }
